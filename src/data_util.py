@@ -107,6 +107,17 @@ class TextCleaner(object):
                 
         return line_seg, line_seg_stop_w
     
+    def clean_chn_line_for_vocab_set(self, line_raw_utf8):
+        '''
+         given a string of Chinese
+         return a set of all possible words of the string
+        '''
+        line = line_raw_utf8
+        
+        ret = set(jieba.lcut(line, cut_all=True))
+        return ret
+            
+    
     def clean_chn_corpus_2file(self, save_path):
         f = open(self.text_path, 'rb') # use 'rb' mode for windows decode problem
         f_w = open(save_path, 'wb')
@@ -217,9 +228,9 @@ class Vocab(object):
         for l in vec_bin_file:
             line = l.decode("utf-8")
             if len(line.split()) != wdim + 1:
-                write_log("length of line in vector file is not consistent with expected:\n")
+                write_log("length of line in vector file is not consistent with expected:")
                 write_log("%s\n" % line)
-                write_log("expected %d, but read %d\n" % (wdim, len(line.split())-1))
+                write_log("expected %d, but read %d" % (wdim, len(line.split())-1))
                 continue
             word = line.split()[0]
             vector_b = line.split()[1:]
@@ -281,12 +292,27 @@ class Vocab(object):
         wdim = cfg.ModelConfig.WORD_DIM_DICT[qa_data_mode]
         wv_source_path = cfg.DirConfig.PRETRAINED_VEC_DIR
         
+        
+        
         if qa_data_mode == 'HITNLP':
+            possible_word_set = set([])
+            vec_bin_file = open(wv_source_path, 'rb') # read it through to extract new word for word segmentation dict
+            line = vec_bin_file.readline()
+            wdim_read = int(line.split()[1])
+            for l in vec_bin_file:
+                line = l.decode("utf-8")
+                if len(line.split()) != wdim_read + 1:
+                    continue
+                word = line.split()[0]
+                possible_word_set.add(word)
+            vec_bin_file.close()
+            for word in possible_word_set:
+                jieba.add_word(word) # add possible new words to jieba dict
             self.task_vocab_set = self._load_wset_from_HITNLP_data(task_data_list)
         else:
             self.task_vocab_set = None
-            write_log("No task dataset was provided for word to be loaded. Will use all words in vec file.\n")
-            print("No task dataset was provided for word to be loaded. Will use all words in vec file.\n")
+            write_log("No task dataset was provided for word to be loaded. Will use all words in vec file.")
+            print("No task dataset was provided for word to be loaded. Will use all words in vec file.")
         
         vec_bin_file = open(wv_source_path, 'rb')
         line = vec_bin_file.readline()
@@ -300,9 +326,9 @@ class Vocab(object):
         for l in vec_bin_file:
             line = l.decode("utf-8")
             if len(line.split()) != wdim + 1:
-                write_log("length of line in vector file is not consistent with expected:\n")
+                write_log("length of line in vector file is not consistent with expected:")
                 write_log("%s\n" % line)
-                write_log("expected %d, but read %d\n" % (wdim, len(line.split())-1))
+                write_log("expected %d, but read %d" % (wdim, len(line.split())-1))
                 continue
             word = line.split()[0]
             vector_b = line.split()[1:]
@@ -314,7 +340,7 @@ class Vocab(object):
             self.idx2word[widx] = word
             widx += 1
             
-        write_log("%d words loaded.\n" % widx)
+        write_log("%d words loaded." % widx)
         self.vocab_size = widx
         self.wdim = wdim_read
         
@@ -403,9 +429,9 @@ class Vocab(object):
                 line_item = line.split('\t')
                 q_raw = line_item[0]
                 a_raw = line_item[1]
-                q_seg_s_w = text_cleaner.clean_chn_line(q_raw, set([]))[1]
-                a_seg_s_w = text_cleaner.clean_chn_line(a_raw, set([]))[1]
-                wset = wset | set(q_seg_s_w) | set(a_seg_s_w)
+                q_wset = text_cleaner.clean_chn_line_for_vocab_set(q_raw)
+                a_wset = text_cleaner.clean_chn_line_for_vocab_set(a_raw)
+                wset = wset | q_wset | a_wset
             f.close()
         return wset
     
