@@ -878,24 +878,15 @@ class SentenceDataStream(object):
          return a tuple: (padded index-sequence list, index-sequence length)
         '''
         zero_vec_idx = self.vocab.get_zero_vec_idx()
-        pad_wide = cfg.ModelConfig.PAD_WIDE
-        conv_filter_len = cfg.ModelConfig.CONV_FILTER_LEN # m gram
         padded_idx_seq_lst = []
         padded_idx_seq_len = max_seq_len
-        if pad_wide:
-            padded_idx_seq_len = max_seq_len + 2 * (conv_filter_len - 1)
         for idx_seq in idx_seq_lst:
-            padded_idx_seq = idx_seq
+            padded_idx_seq = idx_seq # redundant invalid copy?
             if len(idx_seq) < max_seq_len: # to pad
                 padded_idx_seq = idx_seq + [zero_vec_idx for _ in range(max_seq_len-len(idx_seq))]
             elif len(idx_seq) > max_seq_len: # to truncate
                 padded_idx_seq = idx_seq[:max_seq_len]
-            
-            if pad_wide:
-                add_pad_seq = [zero_vec_idx for _ in range(conv_filter_len-1)]
-                padded_idx_seq[0:0] = add_pad_seq # front padding
-                padded_idx_seq.extend(add_pad_seq) # rear padding
-            
+            assert len(padded_idx_seq) == padded_idx_seq_len
             padded_idx_seq_lst.append(padded_idx_seq)
         return (padded_idx_seq_lst, padded_idx_seq_len)
 

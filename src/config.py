@@ -72,14 +72,17 @@ class PreProcessConfig(object):
 
 class ModelConfig(object):
     SUPPORTED_DATASET = set(['HITNLP', 'TREC'])
-    WORD_DIM_DICT = {'HITNLP': 50, 'ENG_TEST': 200, 'CHN_TEST': 200}
+    WORD_DIM_DICT = {'HITNLP': 300, 'ENG_TEST': 200, 'CHN_TEST': 200}
     
     SORT_INSTANCE = False
     PAD_WIDE = True
-    # network config
-    FEATURE_MAP_NUM = 50
-    CONV_FILTER_LEN = 1
-    MAX_SENT_LEN = 300
+    # conv network config
+    FEATURE_MAP_NUM_1 = 50
+    CONV_FILTER_LEN_1 = 1
+    MAX_SENT_LEN_1 = 300
+    FEATURE_MAP_NUM_2 = 300
+    CONV_FILTER_LEN_2 = 1
+    MAX_SENT_LEN_2 = 300
     # train config
     BATCH_SIZE = 32
     TRAIN_EPOCH = 10

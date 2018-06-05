@@ -8,25 +8,36 @@ customized layer design
 '''
 
 from keras import backend as K
+from keras import regularizers
 from keras.engine.topology import Layer
 from keras.backend import max as tensor_max
-from keras.backend import max as tensor_sum
+from keras.backend import sum as tensor_sum
+from keras.backend import exp
 
-class DotMatrixLayer(Layer):
+from keras.constraints import Constraint
+
+class AttentionMatrixLayer(Layer):
     """
-     This is a layer that can be substituted by a Dense layer
+     perform feature attention mechanism from input feature vector to output feature
     """
     def __init__(self, output_dim, **kwargs):
         self.output_dim = output_dim
-        super(DotMatrixLayer, self).__init__(**kwargs)
+        super(AttentionMatrixLayer, self).__init__(**kwargs)
         
     def build(self, input_shape):
         self.kernel = self.add_weight(name='kernel', 
-                                      shape=(input_shape[1], self.output_dim),
-                                      initializer='uniform',
-                                      trainable=True,
-                                      ) # in_shape[1] is vector length
-        super(DotMatrixLayer, self).build(input_shape)
+                            shape=(input_shape[1], self.output_dim),
+                            initializer = 'random_uniform',
+                            regularizer = regularizers.l2(0.0001),
+                            trainable=True,
+                            ) # input_shape[1] is vector length
+        # for-attention multi-dimensional softmax
+        max_for_each_axis = tensor_max(self.kernel, axis=0, keepdims=True)
+        target_to_be_exp = self.kernel - max_for_each_axis # for numerical stability, thanks to raingo @ gist.github.com/raingo/a5808fe356b8da031837
+        exp_tensor = exp(target_to_be_exp)
+        norm = tensor_sum(exp_tensor, axis=0, keepdims=True)
+        self.kernel = exp_tensor / norm
+        super(AttentionMatrixLayer, self).build(input_shape)
         
     def call(self, x):
         return K.dot(x, self.kernel)
@@ -71,3 +82,20 @@ class SumScoreLayer(Layer):
     def compute_output_shape(self, input_shape):
         return (input_shape[0], 1)  # (batch_idx, 1)
     
+class MultiDimSftmxConstraint(Constraint):
+    '''
+     A multi-dimensional constraint on optimization
+    '''
+    def __init__(self, axis=0):
+        self.axis = axis
+        
+    def __call__(self, w):
+        max_for_each_axis = tensor_max(w, axis=self.axis, keepdims=True)
+        target_to_be_exp = w - max_for_each_axis # for numerical stability, thanks to raingo @ gist.github.com/raingo/a5808fe356b8da031837
+        exp_tensor = exp(target_to_be_exp)
+        norm = tensor_sum(exp_tensor, axis=self.axis, keepdims=True)
+        res_sftmx = exp_tensor / norm
+        return res_sftmx
+    
+    def get_config(self):
+        return {'axis': self.axis}

@@ -255,9 +255,11 @@ def grid_search(param):
     '''
     for t_epch in (5, 10, 20):
         for b_size in (32, 64):
-            for feat_map_num in (150, 200, 300, 450, 600):
-                for conv_ftr_len in (1, 2):
-                    h_param_lst.append((feat_map_num, conv_ftr_len, b_size, t_epch))
+            for feat_map_num_1 in (25, 50, 100, 300):
+                for feat_map_num_2 in (150, 200, 300, 450, 600):
+                    if feat_map_num_2 <= feat_map_num_1: continue
+                    for conv_ftr_len in (1, 2):
+                        h_param_lst.append((feat_map_num_1, feat_map_num_2, conv_ftr_len, b_size, t_epch))
     
     for cur_h_param in h_param_lst:
         write_log("\n\n")
@@ -269,14 +271,16 @@ def grid_search(param):
         write_log("PAD_WIDE = %s" % str(cfg.ModelConfig.PAD_WIDE))
         write_log("----------------------------")
         
-        write_log("FEATURE_MAP_NUM = %d" % cur_h_param[0])
-        write_log("CONV_FILTER_LEN = %d" % cur_h_param[1])
-        write_log("BATCH_SIZE = %d" % cur_h_param[2])
-        write_log("TRAIN_EPOCH = %d" % cur_h_param[3])
-        cfg.ModelConfig.FEATURE_MAP_NUM = cur_h_param[0]
-        cfg.ModelConfig.CONV_FILTER_LEN = cur_h_param[1]
-        cfg.ModelConfig.BATCH_SIZE = cur_h_param[2]
-        cfg.ModelConfig.TRAIN_EPOCH = cur_h_param[3]
+        write_log("FEATURE_MAP_NUM_1 = %d" % cur_h_param[0])
+        write_log("FEATURE_MAP_NUM_2 = %d" % cur_h_param[1])
+        write_log("CONV_FILTER_LEN = %d" % cur_h_param[2])
+        write_log("BATCH_SIZE = %d" % cur_h_param[3])
+        write_log("TRAIN_EPOCH = %d" % cur_h_param[4])
+        cfg.ModelConfig.FEATURE_MAP_NUM_1 = cur_h_param[0]
+        cfg.ModelConfig.FEATURE_MAP_NUM_2 = cur_h_param[1]
+        cfg.ModelConfig.CONV_FILTER_LEN = cur_h_param[2]
+        cfg.ModelConfig.BATCH_SIZE = cur_h_param[3]
+        cfg.ModelConfig.TRAIN_EPOCH = cur_h_param[4]
     
         exec_(param)
 

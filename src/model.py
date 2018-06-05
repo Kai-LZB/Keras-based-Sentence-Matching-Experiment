@@ -7,7 +7,7 @@ Model graph module
 
 '''
 import config as cfg
-from layers import MaxOnASeqLayer, SumScoreLayer
+from layers import MaxOnASeqLayer, SumScoreLayer, AttentionMatrixLayer
 from keras.layers import Input, Conv1D, GlobalMaxPooling1D, Dot, Concatenate, Dense, Dropout, Multiply
 from keras import regularizers
 
@@ -15,8 +15,10 @@ from keras import regularizers
 class ConvQAModelGraph(object):
     def __init__(self, wdim):
         # hyperparameters
-        conv_filter_len = cfg.ModelConfig.CONV_FILTER_LEN
-        feat_map_num = cfg.ModelConfig.FEATURE_MAP_NUM
+        conv_filter_len_1 = cfg.ModelConfig.CONV_FILTER_LEN_1
+        feat_map_num_1 = cfg.ModelConfig.FEATURE_MAP_NUM_1
+        conv_filter_len_2 = cfg.ModelConfig.CONV_FILTER_LEN_2
+        feat_map_num_2 = cfg.ModelConfig.FEATURE_MAP_NUM_2
         
         # input dim: (sentence length, word dim)
         _q_input = Input(shape=(None, wdim))
@@ -24,48 +26,43 @@ class ConvQAModelGraph(object):
         _add_feat_input = Input(shape=(4,))
         self.graph_input_units = (_q_input, _a_input, _add_feat_input)
         
-        # feature map dim: (sent_len-filter_len+1, feat_map_num)
-        siamese_conv_layer = Conv1D(input_shape = (None, wdim),
-                                 filters = feat_map_num,
-                                 kernel_size = conv_filter_len,
+        _q_feature_maps = Conv1D(input_shape = (None, wdim),
+                                 filters = feat_map_num_1,
+                                 kernel_size = conv_filter_len_1,
+                                 padding='same',
                                  activation = 'relu',
                                  kernel_regularizer = regularizers.l2(0.00001),
-                                 )
-        _q_feature_maps = siamese_conv_layer(_q_input)
-        _a_feature_maps = siamese_conv_layer(_a_input)
-        #_q_feature_maps = Conv1D(input_shape = (None, wdim),
-        #                         filters = feat_map_num,
-        #                         kernel_size = conv_filter_len,
-        #                         activation = 'relu',
-        #                         kernel_regularizer = regularizers.l2(0.00001),
-        #                         )(_q_input)
-        #_a_feature_maps = Conv1D(input_shape = (None, wdim),
-        #                         filters = feat_map_num,
-        #                         kernel_size = conv_filter_len,
-        #                         activation = 'relu',
-        #                         kernel_regularizer = regularizers.l2(0.00001),
-        #                         )(_a_input)
+                                 )(_q_input)
+        _a_feature_maps = Conv1D(input_shape = (None, wdim),
+                                 filters = feat_map_num_2,
+                                 kernel_size = conv_filter_len_2,
+                                 padding='same',
+                                 activation = 'relu',
+                                 kernel_regularizer = regularizers.l2(0.00001),
+                                 )(_a_input)
                                  
         # pooling res dim: (feat_map_num, )
         _q_pooled_maps = GlobalMaxPooling1D()(_q_feature_maps)
         _a_pooled_maps = GlobalMaxPooling1D()(_a_feature_maps)
         
-        # sentence match res dim: (1, )
-        #sent_match_layer_0 = DotMatrixLayer(output_dim = feat_map_num)
-        sent_match_layer_0 = Dense(units = feat_map_num,
-                                   activation = None,
-                                   use_bias = False,
-                                   kernel_regularizer = regularizers.l2(0.0001),
-                                   )
-        sent_match_layer_1 = Dot(axes=-1)
-        _qM_dot_res = sent_match_layer_0(_q_pooled_maps)
-        _sent_match_res = sent_match_layer_1([_qM_dot_res, _a_pooled_maps])
+        # bilateral feature attention
+        # feat_1 -> feat_2 attention res dim: (feat_map_2, )
+        # feat_2 -> feat_1 attention res dim: (feat_map_1, )
+        attention_layer_1_to_2 = AttentionMatrixLayer(output_dim = feat_map_num_2)
+        attention_layer_2_to_1 = AttentionMatrixLayer(output_dim = feat_map_num_1)
+        attentive_q_to_a_feat = attention_layer_1_to_2(_q_pooled_maps)
+        attentive_a_to_q_feat = attention_layer_2_to_1(_a_pooled_maps)
+        
+        # vec dot vec, res dim: (1, )
+        feat_match_layer = Dot(axes=-1)
+        feat_match_1_to_2 = feat_match_layer([attentive_q_to_a_feat, _a_pooled_maps])
+        feat_match_2_to_1 = feat_match_layer([attentive_a_to_q_feat, _q_pooled_maps])
         
         # concatenate res dim: (2*feat_map_num+5, )
-        _conc_res = Concatenate()([_q_pooled_maps, _sent_match_res, _a_pooled_maps, _add_feat_input])
+        _conc_res = Concatenate()([_q_pooled_maps, _a_pooled_maps, feat_match_1_to_2, feat_match_2_to_1, _add_feat_input])
         
         # hidden layer out dim: (2*feat_map_num+5, )
-        _hid_res = Dense(units = 2 * feat_map_num + 5,
+        _hid_res = Dense(units = feat_map_num_1 + feat_map_num_2 + 2 + 4,
                          activation = 'tanh',
                          use_bias = True,
                          kernel_regularizer = regularizers.l2(0.0001),
