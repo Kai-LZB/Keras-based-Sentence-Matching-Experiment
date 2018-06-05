@@ -31,16 +31,15 @@ class AttentionMatrixLayer(Layer):
                             regularizer = regularizers.l2(0.0001),
                             trainable=True,
                             ) # input_shape[1] is vector length
+        super(AttentionMatrixLayer, self).build(input_shape)
+    def call(self, x):
         # for-attention multi-dimensional softmax
         max_for_each_axis = tensor_max(self.kernel, axis=0, keepdims=True)
         target_to_be_exp = self.kernel - max_for_each_axis # for numerical stability, thanks to raingo @ gist.github.com/raingo/a5808fe356b8da031837
         exp_tensor = exp(target_to_be_exp)
         norm = tensor_sum(exp_tensor, axis=0, keepdims=True)
-        self.kernel = exp_tensor / norm
-        super(AttentionMatrixLayer, self).build(input_shape)
-        
-    def call(self, x):
-        return K.dot(x, self.kernel)
+        target_w = exp_tensor / norm
+        return K.dot(x, target_w)
     
     def compute_output_shape(self, input_shape):
         return (input_shape[0], self.output_dim) # I would say in_shape[0] is batch dim
