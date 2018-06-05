@@ -25,18 +25,26 @@ class ConvQAModelGraph(object):
         self.graph_input_units = (_q_input, _a_input, _add_feat_input)
         
         # feature map dim: (sent_len-filter_len+1, feat_map_num)
-        _q_feature_maps = Conv1D(input_shape = (None, wdim),
+        siamese_conv_layer = Conv1D(input_shape = (None, wdim),
                                  filters = feat_map_num,
                                  kernel_size = conv_filter_len,
                                  activation = 'relu',
                                  kernel_regularizer = regularizers.l2(0.00001),
-                                 )(_q_input)
-        _a_feature_maps = Conv1D(input_shape = (None, wdim),
-                                 filters = feat_map_num,
-                                 kernel_size = conv_filter_len,
-                                 activation = 'relu',
-                                 kernel_regularizer = regularizers.l2(0.00001),
-                                 )(_a_input)
+                                 )
+        _q_feature_maps = siamese_conv_layer(_q_input)
+        _a_feature_maps = siamese_conv_layer(_a_input)
+        #_q_feature_maps = Conv1D(input_shape = (None, wdim),
+        #                         filters = feat_map_num,
+        #                         kernel_size = conv_filter_len,
+        #                         activation = 'relu',
+        #                         kernel_regularizer = regularizers.l2(0.00001),
+        #                         )(_q_input)
+        #_a_feature_maps = Conv1D(input_shape = (None, wdim),
+        #                         filters = feat_map_num,
+        #                         kernel_size = conv_filter_len,
+        #                         activation = 'relu',
+        #                         kernel_regularizer = regularizers.l2(0.00001),
+        #                         )(_a_input)
                                  
         # pooling res dim: (feat_map_num, )
         _q_pooled_maps = GlobalMaxPooling1D()(_q_feature_maps)
