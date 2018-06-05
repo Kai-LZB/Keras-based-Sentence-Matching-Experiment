@@ -253,10 +253,10 @@ def grid_search(param):
     '''
      this is the grid search section to be modified by testers
     '''
-    for t_epch in (5, 10, 15, 20, 25):
-        for b_size in (5, 10, 32, 50, 64, 80, 100):
-            for feat_map_num in (50, 75, 100, 125, 150):
-                for conv_ftr_len in (1, 2, 3, 4, 5, 6, 7, 8):
+    for t_epch in (5, 10, 20):
+        for b_size in (32, 64):
+            for feat_map_num in (150, 200, 300, 450, 600):
+                for conv_ftr_len in (1, 2):
                     h_param_lst.append((feat_map_num, conv_ftr_len, b_size, t_epch))
     
     for cur_h_param in h_param_lst:
