@@ -12,7 +12,7 @@ from keras import regularizers
 from keras.engine.topology import Layer
 from keras.backend import max as tensor_max
 from keras.backend import sum as tensor_sum
-from keras.backend import exp
+from keras.backend import exp, l2_normalize
 
 from keras.constraints import Constraint
 
@@ -27,31 +27,54 @@ class AttentionMatrixLayer(Layer):
     def build(self, input_shape):
         self.kernel = self.add_weight(name='kernel', 
                             shape=(input_shape[1], self.output_dim),
-                            initializer = 'random_uniform',
+                            initializer = 'ones', # 'random_uniform'
                             regularizer = regularizers.l2(0.0001),
                             trainable=True,
-                            ) # input_shape[1] is vector length
+                            ) # input_shape[1] is weight vector(each col, for input vec) length
         super(AttentionMatrixLayer, self).build(input_shape)
     def call(self, x):
         # for-attention multi-dimensional softmax
-        max_for_each_axis = tensor_max(self.kernel, axis=0, keepdims=True)
-        target_to_be_exp = self.kernel - max_for_each_axis # for numerical stability, thanks to raingo @ gist.github.com/raingo/a5808fe356b8da031837
-        exp_tensor = exp(target_to_be_exp)
-        norm = tensor_sum(exp_tensor, axis=0, keepdims=True)
-        target_w = exp_tensor / norm
+        #max_for_each_axis = tensor_max(self.kernel, axis=0, keepdims=True)
+        #target_to_be_exp = self.kernel - max_for_each_axis # for numerical stability, thanks to raingo @ gist.github.com/raingo/a5808fe356b8da031837
+        #exp_tensor = exp(target_to_be_exp)
+        #norm = tensor_sum(exp_tensor, axis=0, keepdims=True)
+        #target_w = exp_tensor / norm
+        
+        # for-attention l2-normalization
+        target_w = l2_normalize(self.kernel, axis = 0)
+        
+        # for-attention raw transformation
+        #target_w = self.kernel
         return K.dot(x, target_w)
     
     def compute_output_shape(self, input_shape):
         return (input_shape[0], self.output_dim) # I would say in_shape[0] is batch dim
         
+class L2NormLayer(Layer):
+    """
+     perform l2 normalization for vector
+    """
+    def __init__(self, **kwargs):
+        super(L2NormLayer, self).__init__(**kwargs)
         
+    def build(self, input_shape):
+        super(L2NormLayer, self).build(input_shape)
+    
+    def call(self, x):
+        return l2_normalize(x, axis = -1)
+    
+    def compute_output_shape(self, input_shape):
+        return (input_shape[0], input_shape[1]) # I would say in_shape[0] is batch dim
+
+
 class MaxOnASeqLayer(Layer):
     """
      Given tensor (q_len, a_len)
      this layer calc for each word in q the best match in a, getting the max cos sim score
     """
-    def __init__(self, **kwargs):
+    def __init__(self, len_norm, **kwargs):
         #self.output_dim = output_dim
+        self.len_norm = len_norm # denominator for sum
         super(MaxOnASeqLayer, self).__init__(**kwargs)
         
     def build(self, input_shape):
@@ -65,7 +88,7 @@ class MaxOnASeqLayer(Layer):
 
 class SumScoreLayer(Layer):
     """
-     Given tensor (q_len)
+     Given tensor of size (q_len,)
      this layer sums best match score for each word in q, calc the general score 
     """
     def __init__(self, **kwargs):

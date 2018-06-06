@@ -664,7 +664,8 @@ class SentenceDataStream(object):
         stop_set = self.vocab.get_stop_word_set()
             
         to_sort = cfg.ModelConfig.SORT_INSTANCE
-        max_sent_len = cfg.ModelConfig.MAX_SENT_LEN
+        max_sent_len_1 = cfg.ModelConfig.MAX_SENT_LEN_1
+        max_sent_len_2 = cfg.ModelConfig.MAX_SENT_LEN_1
         
         f = (open(qa_file_path, 'rb'))
         for l in f:
@@ -741,8 +742,8 @@ class SentenceDataStream(object):
             # padding
             q_len_lst = [len(seq) for seq in q_idx_seq_lst]
             a_len_lst = [len(seq) for seq in a_idx_seq_lst]
-            max_q_len = min(max_sent_len, max(q_len_lst))
-            max_a_len = min(max_sent_len, max(a_len_lst))
+            max_q_len = min(max_sent_len_1, max(q_len_lst))
+            max_a_len = min(max_sent_len_2, max(a_len_lst))
             
             (padded_q_idx_seq_lst, p_q_s_len) = self._pad(q_idx_seq_lst, max_q_len)
             (padded_a_idx_seq_lst, p_a_s_len) = self._pad(a_idx_seq_lst, max_a_len)

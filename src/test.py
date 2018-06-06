@@ -5,7 +5,7 @@
 
 #from model import DistSimEvalModelGraph, ConvQAModelGraph
 #from keras.models import Model
-from layers import AttentionMatrixLayer
+from layers import AttentionMatrixLayer, L2NormLayer
 from keras.constraints import non_neg
 from keras.backend import variable, eval, dot
 import numpy as np
@@ -35,6 +35,7 @@ if __name__ == '__main__':
     from keras.models import Sequential
     model = Sequential()
     model.add(AttentionMatrixLayer(input_shape=(5,), output_dim=10))
+    model.add(L2NormLayer())
     model.compile(optimizer='adadelta', loss='binary_crossentropy')
     #model.fit(x=np.array([[1.0,1.0,1.0,1.0,1.0]]), y=)
     for layer in model.layers:

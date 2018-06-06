@@ -55,7 +55,7 @@ class PreProcessConfig(object):
      cleaning text for qa data set
     '''
     CORPUS_MODE = '_PRETRAINED' # 'ENG_TEST', 'CHN_TEST', 'MIXED_CHN', '_PRETRAINED'...
-    LING_UNIT = "CHAR" # "WORD" and "CHAR" # must be "WORD" for "_PRETRAINED" corpus mode
+    LING_UNIT = "WORD" # "WORD" and "CHAR" # must be "WORD" for "_PRETRAINED" corpus mode
     # text cleaning
     PUNCTUALATION_REMOVAL = True 
     STOP_WORD_REMOVAL = False 
