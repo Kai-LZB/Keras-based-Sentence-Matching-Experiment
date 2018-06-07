@@ -21,6 +21,7 @@ import jieba
 
 digit_ch_set = set(['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '０', '１', '２', '３', '４', '５', '６', '７', '８', '９'])
 punc_re_str = "[][！？。｡＂＃＄％＆＇―（）—＊＋，－／：；＜＝＞＠［＼］＾＿｀｛｜｝～｟｠｢｣､、〃《》「」『』【】〔〕〖〗〘〙〚〛〜〝〞·〟〰〾〿–—‘’‛“”„‟…‧﹏.!\"#%&\'()+,-/:;<=>@\\\^_`{}~\s\t\.\^\$\*\+\?\|]+"
+EPLISON = 1e-5
 class TextCleaner(object):
     '''
      text cleaner instance
@@ -687,13 +688,13 @@ class SentenceDataStream(object):
             a_seg_non_s, a_seg_s_w = self.text_cleaner.clean_chn_line(a_raw, stop_set)
             # calculate sentence length / sent word set length
             if q_denom == 'SENTENCE_LEN':
-                q_len_denom = 1.0 / float(len(q_seg_non_s))
+                q_len_denom = 1.0 / float(max(len(q_seg_non_s), EPLISON))
             else:
-                q_len_denom = 1.0 / float(len(set(q_seg_non_s)))
+                q_len_denom = 1.0 / float(max(len(set(q_seg_non_s)), EPLISON))
             if a_denom == 'SENTENCE_LEN':
-                a_len_denom = 1.0 / float(len(a_seg_non_s))
+                a_len_denom = 1.0 / float(max(len(a_seg_non_s), EPLISON))
             else:
-                a_len_denom = 1.0 / float(len(set(a_seg_non_s)))
+                a_len_denom = 1.0 / float(max(len(set(a_seg_non_s)), EPLISON))
             
             # translate word to word indices
             if s_w_rmvl:
