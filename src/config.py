@@ -88,9 +88,10 @@ class ModelConfig(object):
     # word-level similarity config
     Q_DENOMINATOR = 'SENTENCE_LEN'#, 'SET_LEN'
     A_DENOMINATOR = 'SENTENCE_LEN'#, 'SET_LEN'
+    PERSPECTIVES = 5
     # train config
     BATCH_SIZE = 32
-    TRAIN_EPOCH = 10
+    TRAIN_EPOCH = 5
     LOSS_FUNC = 'binary_crossentropy'
     OPT = 'adadelta'
     

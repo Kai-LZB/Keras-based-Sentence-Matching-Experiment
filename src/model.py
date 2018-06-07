@@ -21,6 +21,7 @@ class ConvQAModelGraph(object):
         feat_map_num_1 = cfg.ModelConfig.FEATURE_MAP_NUM_1
         conv_filter_len_2 = cfg.ModelConfig.CONV_FILTER_LEN_2
         feat_map_num_2 = cfg.ModelConfig.FEATURE_MAP_NUM_2
+        perspectives = cfg.ModelConfig.PERSPECTIVES
         
         # input dim: (sentence length, word dim)
         _q_input = Input(shape=(None, wdim))
@@ -87,31 +88,56 @@ class ConvQAModelGraph(object):
         
         # distributional similarity, out dim: (1, )
         #_atten_q = TimeDistributed(AttentionMatrixLayer(output_dim=wdim))(_q_input)
-        #gate_layer = TimeDistributed(Dense(units = wdim,
-        #                                    activation = 'sigmoid',
-        #                                    use_bias = True,
-        #                                    ))
-        #_gate_for_q = gate_layer(_q_input)
-        #_gate_for_a = gate_layer(_a_input)
-        #_gated_q = Multiply()([_q_input, _gate_for_q])
-        #_gated_a = Multiply()([_a_input, _gate_for_a])
-        #_gated_q = Multiply()([_atten_q, _gate_for_q])
-        _q_vec_normed = L2NormLayer()(_q_input) # (sent len, wdim)
-        _a_vec_normed = L2NormLayer()(_a_input)
-        vec_cos_sim_calc_layer = Dot(axes=-1)
-        _q_a_sim_mtx = vec_cos_sim_calc_layer([_q_vec_normed, _a_vec_normed]) # (q_sent_len, a_sent_len)
-        _q_words_best_match = MaxOnASeqLayer()(_q_a_sim_mtx) # (q_sent_len, )
+        '''
+        gate_layer = TimeDistributed(Dense(units = wdim,
+                                            activation = 'sigmoid',
+                                            use_bias = True,
+                                            ))
+        _gate_for_q = gate_layer(_q_input)
+        _gate_for_a = gate_layer(_a_input)
+        _gated_q = Multiply()([_q_input, _gate_for_q])
+        _gated_a = Multiply()([_a_input, _gate_for_a])
+        _q_vec_normed = L2NormLayer()(_gated_q) # (sent len, wdim)
+        _a_vec_normed = L2NormLayer()(_gated_a)
+        _q_a_sim_mtx = Dot(axes=-1)([_q_vec_normed, _a_vec_normed])
+        _q_words_best_match = MaxOnASeqLayer()(_q_a_sim_mtx)
         _q_match_score_sum = SumScoreLayer()(_q_words_best_match) # (1, )
         _q_match_score_ave = Multiply()([_q_match_score_sum, _q_len_denom_input]) # (1, )
-        
+        '''
+        # multi-perspective version of the above mechanism
+        _gate_layer_lst = []
+        _q_gate_lst = []
+        _a_gate_lst = []
+        _gated_q_lst = []
+        _gated_a_lst = []
+        _vec_normed_q_lst = []
+        _vec_normed_a_lst = []
+        _sim_mtx_lst = []
+        _q_words_best_match_lst = []
+        _q_score_lst = []
+        for i in perspectives:
+            _gate_layer_lst.append(TimeDistributed(Dense(units = wdim,
+                                                  activation = 'sigmoid',
+                                                  use_bias = True,
+                                                  )))
+            _q_gate_lst.append(_gate_layer_lst[i](_q_input)) # (perspectives, sent len, wdim)
+            _a_gate_lst.append(_gate_layer_lst[i](_a_input))
+            _gated_q_lst.append(Multiply()([_q_input, _q_gate_lst[i]])) # (perspectives, sent len, wdim)
+            _gated_a_lst.append(Multiply()([_a_input, _a_gate_lst[i]]))
+            _vec_normed_q_lst.append(L2NormLayer()(_gated_q_lst[i]))
+            _vec_normed_a_lst.append(L2NormLayer()(_gated_a_lst[i]))
+            _sim_mtx_lst.append(Dot(axes=-1)([_vec_normed_q_lst[i], _vec_normed_a_lst[i]])) # (perspectives, q_sent_len, a_sent_len)
+            _q_words_best_match_lst.append(MaxOnASeqLayer()(_sim_mtx_lst[i])) # (perspectives, q_sent_len)
+            _sum_along_q = SumScoreLayer()(_q_words_best_match_lst[i]) # (1, )
+            _q_score_lst.append(Multiply()([_sum_along_q, _q_len_denom_input])) # (perspectives, 1)
         
         # concatenate res dim: (6, )
         #_conc_res = Concatenate()([_q_pooled_maps_siam, _a_pooled_maps_siam, feat_match_1_to_2, feat_match_2_to_1, _add_feat_input])
         #_conc_res = Concatenate()([feat_match_1_to_2, feat_match_2_to_1, _add_feat_input])
-        _conc_res = Concatenate()([_q_match_score_ave, ])
+        _conc_res = Concatenate()(_q_score_lst)
         
         # hidden layer out dim: (6, )
-        _hid_res = Dense(units = 1,#2 + 4,
+        _hid_res = Dense(units = perspectives,# + 4,
                          activation = 'tanh',
                          use_bias = True,
                          kernel_regularizer = regularizers.l2(0.0001),
