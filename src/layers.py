@@ -64,7 +64,7 @@ class L2NormLayer(Layer):
         return l2_normalize(x, axis = -1)
     
     def compute_output_shape(self, input_shape):
-        return (input_shape[0], input_shape[1]) # I would say in_shape[0] is batch dim
+        return input_shape # I would say in_shape[0] is batch dim
 
 
 class MaxOnASeqLayer(Layer):
@@ -72,9 +72,8 @@ class MaxOnASeqLayer(Layer):
      Given tensor (q_len, a_len)
      this layer calc for each word in q the best match in a, getting the max cos sim score
     """
-    def __init__(self, len_norm, **kwargs):
+    def __init__(self, **kwargs):
         #self.output_dim = output_dim
-        self.len_norm = len_norm # denominator for sum
         super(MaxOnASeqLayer, self).__init__(**kwargs)
         
     def build(self, input_shape):

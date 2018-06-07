@@ -77,6 +77,8 @@ class ModelConfig(object):
     SORT_INSTANCE = False
     PAD_WIDE = True
     # conv network config
+    FEATURE_MAP_NUM_SIAM = 500
+    CONV_FILTER_LEN_SIAM = 1
     FEATURE_MAP_NUM_1 = 50
     CONV_FILTER_LEN_1 = 1
     MAX_SENT_LEN_1 = 300

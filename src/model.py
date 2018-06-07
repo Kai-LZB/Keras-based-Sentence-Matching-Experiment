@@ -15,6 +15,8 @@ from keras import regularizers
 class ConvQAModelGraph(object):
     def __init__(self, wdim):
         # hyperparameters
+        conv_filter_len_siam = cfg.ModelConfig.CONV_FILTER_LEN_SIAM
+        feat_map_num_siam = cfg.ModelConfig.FEATURE_MAP_NUM_SIAM
         conv_filter_len_1 = cfg.ModelConfig.CONV_FILTER_LEN_1
         feat_map_num_1 = cfg.ModelConfig.FEATURE_MAP_NUM_1
         conv_filter_len_2 = cfg.ModelConfig.CONV_FILTER_LEN_2
@@ -135,7 +137,7 @@ class ConvQAModelGraph(object):
     def get_model_outputs(self):
         return self.graph_output_unit
 
-class DistSimEvalModelGraph(object):
+class TestModelGraph(object):
     def __init__(self, wdim):
         # input dim: (sentence length, word dim)
         _q_input = Input(shape=(None, wdim))
@@ -143,18 +145,16 @@ class DistSimEvalModelGraph(object):
         _a_input = Input(shape=(None, wdim))
         self.input_graph_unit = (_q_input, _q_len_input, _a_input)
         
+        _q_vec_normed = L2NormLayer()(_q_input)
+        _a_vec_normed = L2NormLayer()(_a_input)
         vec_cos_sim_calc_layer = Dot(axes=-1)
         # output dim: (q sentence length, a sentence length)
-        cos_sim_score_q_a = vec_cos_sim_calc_layer([_q_input, _a_input])
+        cos_sim_score_q_a = vec_cos_sim_calc_layer([_q_vec_normed, _a_vec_normed])
+        _q_words_best_match = MaxOnASeqLayer()(cos_sim_score_q_a)
+        _q_match_score_sum = SumScoreLayer()(_q_words_best_match) # (1, )
+        _q_match_score_ave = Multiply()([_q_match_score_sum, _q_len_input]) # (1, )
         
-        # output dim: (q sentence length,))
-        max_cos_sim_score_4_q = MaxOnASeqLayer()(cos_sim_score_q_a)
-        score_divided = Multiply()([max_cos_sim_score_4_q, _q_len_input])
-        
-        # output dim: (1,) each batch one
-        score_ave = SumScoreLayer()(score_divided)
-        
-        self.output_graph_unit = score_ave
+        self.output_graph_unit = _q_match_score_ave, _q_match_score_sum, _q_words_best_match, cos_sim_score_q_a
     
     def get_model_inputs(self):
         return self.input_graph_unit
