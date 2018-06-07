@@ -8,7 +8,7 @@ Model graph module
 '''
 import config as cfg
 from layers import MaxOnASeqLayer, SumScoreLayer, AttentionMatrixLayer, L2NormLayer
-from keras.layers import Input, Conv1D, GlobalMaxPooling1D, Dot, Concatenate, Dense, Dropout, Multiply
+from keras.layers import Input, Conv1D, GlobalMaxPooling1D, Dot, Concatenate, Dense, Dropout, Multiply, TimeDistributed, Activation
 from keras import regularizers
 
 
@@ -86,6 +86,16 @@ class ConvQAModelGraph(object):
         #feat_match_2_to_1 = feat_match_layer([normed_a_to_q_feat, normed_q_feat])
         
         # distributional similarity, out dim: (1, )
+        #_atten_q = TimeDistributed(AttentionMatrixLayer(output_dim=wdim))(_q_input)
+        #gate_layer = TimeDistributed(Dense(units = wdim,
+        #                                    activation = 'sigmoid',
+        #                                    use_bias = True,
+        #                                    ))
+        #_gate_for_q = gate_layer(_q_input)
+        #_gate_for_a = gate_layer(_a_input)
+        #_gated_q = Multiply()([_q_input, _gate_for_q])
+        #_gated_a = Multiply()([_a_input, _gate_for_a])
+        #_gated_q = Multiply()([_atten_q, _gate_for_q])
         _q_vec_normed = L2NormLayer()(_q_input) # (sent len, wdim)
         _a_vec_normed = L2NormLayer()(_a_input)
         vec_cos_sim_calc_layer = Dot(axes=-1)
