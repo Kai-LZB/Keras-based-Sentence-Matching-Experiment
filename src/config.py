@@ -83,6 +83,9 @@ class ModelConfig(object):
     FEATURE_MAP_NUM_2 = 300
     CONV_FILTER_LEN_2 = 1
     MAX_SENT_LEN_2 = 300
+    # word-level similarity config
+    Q_DENOMINATOR = 'SENTENCE_LEN'#, 'SET_LEN'
+    A_DENOMINATOR = 'SENTENCE_LEN'#, 'SET_LEN'
     # train config
     BATCH_SIZE = 32
     TRAIN_EPOCH = 10

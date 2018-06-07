@@ -121,10 +121,10 @@ def exec_(param):
         g = data_stream.get_batch()
         while(True):
             try:
-                q_batch, a_batch, add_feat_batch = next(g)
+                q_batch, a_batch, q_len_batch, a_len_batch, add_feat_batch = next(g)
             except StopIteration:
                 break
-            x = [q_batch, a_batch, add_feat_batch]
+            x = [q_batch, a_batch, q_len_batch, a_len_batch, add_feat_batch]
             predicted_batch = list(my_model.predict(x, batch_size))
             predicted_score_lst.extend(predicted_batch)
             # y = model.predict(x, batch_size=batch_size)
@@ -178,10 +178,10 @@ def exec_(param):
             g = data_stream.get_batch()
             while(True):
                 try:
-                    q_batch, a_batch, label_batch, add_feat_batch = next(g)
+                    q_batch, a_batch, q_len_batch, a_len_batch, label_batch, add_feat_batch = next(g)
                 except StopIteration:
                     break
-                x = [q_batch, a_batch, add_feat_batch]
+                x = [q_batch, a_batch, q_len_batch, a_len_batch, add_feat_batch]
                 y = [label_batch]
                 my_model.fit(x, y, batch_size=batch_size)
         my_model.save_weights(model_weight_path)
@@ -224,10 +224,10 @@ def exec_(param):
         g = data_stream.get_batch()
         while(True):
             try:
-                q_batch, a_batch, add_feat_batch = next(g)
+                q_batch, a_batch, q_len_batch, a_len_batch, add_feat_batch = next(g)
             except StopIteration:
                 break
-            x = [q_batch, a_batch, add_feat_batch]
+            x = [q_batch, a_batch, q_len_batch, a_len_batch, add_feat_batch]
             predicted_batch = list(my_model.predict(x, batch_size))
             predicted_score_lst.extend(predicted_batch)
             # y = model.predict(x, batch_size=batch_size)
