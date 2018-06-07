@@ -752,8 +752,8 @@ class SentenceDataStream(object):
             for i in range(batch_start, batch_end):
                 q_idx_seq_lst.append(self.instances[i][0]) # element: list of word index list
                 a_idx_seq_lst.append(self.instances[i][1])
-                q_len_lst_to_model.append([self.instances[i][1],]) # element: lists having 1 digit
-                a_len_lst_to_model.append([self.instances[i][2],])
+                q_len_lst_to_model.append([self.instances[i][2],]) # element: lists having 1 digit
+                a_len_lst_to_model.append([self.instances[i][3],])
                 add_feat_lst.append([self.instances[i][-4],
                                     self.instances[i][-3],
                                     self.instances[i][-2],
