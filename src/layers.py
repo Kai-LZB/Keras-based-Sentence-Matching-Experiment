@@ -26,7 +26,7 @@ class AttentionMatrixLayer(Layer):
         
     def build(self, input_shape):
         self.kernel = self.add_weight(name='kernel', 
-                            shape=(input_shape[1], self.output_dim),
+                            shape=(input_shape[1], self.output_dim), # q_len, a_len
                             initializer = 'ones', # 'random_uniform'
                             regularizer = regularizers.l2(0.0001),
                             trainable=True,
@@ -34,7 +34,7 @@ class AttentionMatrixLayer(Layer):
         super(AttentionMatrixLayer, self).build(input_shape)
     def call(self, x):
         # for-attention multi-dimensional softmax
-        #max_for_each_axis = tensor_max(self.kernel, axis=0, keepdims=True)
+        #max_for_each_axis = tensor_max(self.kernel, axis=0, keepdims=True) # 1, a len
         #target_to_be_exp = self.kernel - max_for_each_axis # for numerical stability, thanks to raingo @ gist.github.com/raingo/a5808fe356b8da031837
         #exp_tensor = exp(target_to_be_exp)
         #norm = tensor_sum(exp_tensor, axis=0, keepdims=True)
@@ -49,6 +49,8 @@ class AttentionMatrixLayer(Layer):
     
     def compute_output_shape(self, input_shape):
         return (input_shape[0], self.output_dim) # I would say in_shape[0] is batch dim
+    
+
         
 class L2NormLayer(Layer):
     """
@@ -102,6 +104,33 @@ class SumScoreLayer(Layer):
     
     def compute_output_shape(self, input_shape):
         return (input_shape[0], 1)  # (batch_idx, 1)
+    
+class SumByAxisLayer(Layer):
+    """
+     Given tensor of any size
+     this layer sums along the specified axis
+    """
+    def __init__(self, axis = -1, keepdims=True, **kwargs):
+        self.axis = axis
+        self.keepdims = keepdims
+        super(SumByAxisLayer, self).__init__(**kwargs)
+        
+    def build(self, input_shape):
+        super(SumByAxisLayer, self).build(input_shape)
+        
+    def call(self, x):
+        return tensor_sum(x, axis=self.axis, keepdims=self.keepdims)
+    
+    def compute_output_shape(self, input_shape):
+        axis = self.axis
+        if self.keepdims and axis == -1:
+            return input_shape[:axis] + (1,)
+        elif self.keepdims:
+            return input_shape[:axis] + (1,) + input_shape[axis+1:]
+        elif axis == -1:
+            return input_shape[:axis]
+        else:
+            return input_shape[:axis] + input_shape[axis+1:]
     
 class MultiDimSftmxConstraint(Constraint):
     '''

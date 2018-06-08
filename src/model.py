@@ -7,8 +7,8 @@ Model graph module
 
 '''
 import config as cfg
-from layers import MaxOnASeqLayer, SumScoreLayer, AttentionMatrixLayer, L2NormLayer
-from keras.layers import Input, Conv1D, GlobalMaxPooling1D, Dot, Concatenate, Dense, Dropout, Multiply, TimeDistributed, Activation
+from layers import MaxOnASeqLayer, SumScoreLayer, AttentionMatrixLayer, L2NormLayer, SumByAxisLayer
+from keras.layers import Input, Conv1D, GlobalMaxPooling1D, Dot, Concatenate, Dense, Dropout, Multiply, TimeDistributed, Softmax
 from keras.layers import Permute, Reshape
 from keras import regularizers
 
@@ -114,6 +114,7 @@ class ConvQAModelGraph(object):
         _vec_normed_q_lst = []
         _vec_normed_a_lst = []
         _sim_mtx_lst = []
+        _word_atten_mtx_lst= []
         _q_words_best_match_lst = []
         _q_score_lst = []
         for i in range(perspectives):
@@ -125,15 +126,17 @@ class ConvQAModelGraph(object):
             _a_gate_lst.append(_gate_layer_lst[i](_a_input))
             _gated_q_lst.append(Multiply()([_q_input, _q_gate_lst[i]])) # (perspectives, sent len, wdim)
             _gated_a_lst.append(Multiply()([_a_input, _a_gate_lst[i]]))
-            _vec_normed_q_lst.append(L2NormLayer()(_gated_q_lst[i]))
+            _vec_normed_q_lst.append(L2NormLayer()(_gated_q_lst[i])) # (perspectives, sent len, wdim)
             _vec_normed_a_lst.append(L2NormLayer()(_gated_a_lst[i]))
             _sim_mtx_lst.append(Dot(axes=-1)([_vec_normed_q_lst[i], _vec_normed_a_lst[i]])) # (perspectives, q_sent_len, a_sent_len)
+            _word_atten_mtx_lst.append()
             _q_words_best_match_lst.append(MaxOnASeqLayer()(_sim_mtx_lst[i])) # (perspectives, q_sent_len)
             _sum_along_q = SumScoreLayer()(_q_words_best_match_lst[i]) # (1, )
             _q_score_lst.append(Multiply()([_sum_along_q, _q_len_denom_input])) # (perspectives, 1)
         
-        feed_fwd_lst = _q_score_lst
-        # concatenate res dim: (6, )
+        feed_fwd_lst = _q_score_lst # a list of tensors to concatenate
+        feed_fwd_tensr_len = perspectives # + 4
+        # concatenate res dim: (?, )
         #_conc_res = Concatenate()([_q_pooled_maps_siam, _a_pooled_maps_siam, feat_match_1_to_2, feat_match_2_to_1, _add_feat_input])
         #_conc_res = Concatenate()([feat_match_1_to_2, feat_match_2_to_1, _add_feat_input])
         if len(feed_fwd_lst) > 1:
@@ -141,38 +144,28 @@ class ConvQAModelGraph(object):
         else:
             _conc_res = feed_fwd_lst[0]
         
-        # hidden layer out dim: (6, )
-        _hid_res = Dense(units = 1, #perspectives,# + 4,
-                         activation = 'tanh',
-                         kernel_initializer = 'random_uniform',
-                         use_bias = False, # True, kernel_regularizer = regularizers.l2(0.0001),
-                         )(_conc_res)
-        _hid_res_normed = L2NormLayer()(_hid_res)
-                         
+        # hidden layer out dim: (?, )
+        #_hid_gate_weight = Dense(units = feed_fwd_tensr_len, # always in accordance with input
+        #                         activation = 'tanh',
+        #                         use_bias = False,
+        #                         kernel_regularizer = regularizers.l2(0.0001),
+        #                         )(_conc_res)
         # dropout some units before computing softmax result
-        #_dropped_hid_res = Dropout(rate=0.5)(_hid_res)
-                        
-        # softmax binary classifier out dim: (2, )
-        """_bin_res = Dense(units = 2,
-                         activation = 'softmax',
-                         use_bias = False,
-                         kernel_regularizer = regularizers.l2(0.0001),
-                         )(_dropped_hid_res)
-        
-        self.graph_output_unit = _bin_res[:, 0]"""
+        #_dropped_hid_gate = Dropout(rate=0.5)(_hid_gate_weight)
+        #_hid_res = Multiply()([_hid_gate_weight, _conc_res])
         
         #_res = Dense(units = 1,
         #             activation = 'sigmoid',
         #             use_bias = False,
         #             kernel_regularizer = regularizers.l2(0.0001),
         #             )(_dropped_hid_res)
-        _res_atten_weight = Dense(units = 1,
+        _res_gate_weight = Dense(units = feed_fwd_tensr_len, # always in accordance with input
                      activation = 'softmax',
                      use_bias = False,
                      kernel_regularizer = regularizers.l2(0.0001),
-                     )(_hid_res_normed)
-        _res = Dot(axes=-1)([_res_atten_weight, _hid_res_normed])
-        self.graph_output_unit = _hid_res
+                     )(_conc_res)
+        _res = Dot(axes=-1)([_res_gate_weight, _conc_res])
+        self.graph_output_unit = _res
         
     def get_model_inputs(self):
         return self.graph_input_units
@@ -183,21 +176,22 @@ class ConvQAModelGraph(object):
 class TestModelGraph(object):
     def __init__(self, wdim):
         # input dim: (sentence length, word dim)
-        _q_input = Input(shape=(None, wdim))
-        _q_sent_len = _q_input.get_config['batch_input_shape'][1]
+        _q_input = Input(shape=(2, wdim))
+        #_q_sent_len = _q_input.get_config['batch_input_shape'][1]
         _q_len_input = Input(shape=(1, )) # (1,), every elem: 1 / len(q) || 1 / len(set(q))
-        _a_input = Input(shape=(None, wdim))
+        _a_input = Input(shape=(3, wdim))
         #_a_sent_len = _a_input.get_config['batch_input_shape'][1]
         self.input_graph_unit = (_q_input, _q_len_input, _a_input)
         
-        _q_vec_normed = L2NormLayer()(_q_input)
+        _q_vec_normed = L2NormLayer()(_q_input) #(q_len, wdim)
         _a_vec_normed = L2NormLayer()(_a_input)
         # output dim: (q sentence length, a sentence length)
-        cos_sim_score_q_a = Dot(axes=-1)([_q_vec_normed, _a_vec_normed])
+        cos_sim_score_q_a = Dot(axes = -1)([_q_vec_normed, _a_vec_normed]) # (q_len, a_len)
+        #atten_tsr = TimeDistributed(Multiply())([_q_vec_normed, _a_vec_normed])
         #sim_mtx_T = Permute((2, 1))(cos_sim_score_q_a)
-        sim_mtx_sftmx = Activation('softmax', axis = -2)(cos_sim_score_q_a)
-        #atten_mtx = Reshape((_q_sent_len, _a_sent_len, 1))(sim_mtx_sftmx)
-        atten_mtx = Reshape((None, None, 1))(sim_mtx_sftmx)
+        atten_mtx_sftmx = Softmax(axis = -2)(cos_sim_score_q_a) # (q_len, a_len)
+        atten_ctxt_mtx = Dot(axes = -2)([atten_mtx_sftmx, _q_input])
+        
         
         
         '''
@@ -212,7 +206,7 @@ class TestModelGraph(object):
                          )
         hid_res = hid_layer(_q_match_score_ave)
         '''
-        self.output_graph_unit = atten_mtx#hid_res, _q_match_score_ave, _q_match_score_sum, _q_words_best_match, cos_sim_score_q_a
+        self.output_graph_unit = atten_ctxt_mtx#hid_res, _q_match_score_ave, _q_match_score_sum, _q_words_best_match, cos_sim_score_q_a
     
     def get_model_inputs(self):
         return self.input_graph_unit
