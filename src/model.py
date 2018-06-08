@@ -105,37 +105,50 @@ class ConvQAModelGraph(object):
         _q_match_score_sum = SumScoreLayer()(_q_words_best_match) # (1, )
         _q_match_score_ave = Multiply()([_q_match_score_sum, _q_len_denom_input]) # (1, )
         '''
-        # multi-perspective version of the above mechanism
-        _gate_layer_lst = []
-        _q_gate_lst = []
-        _a_gate_lst = []
-        _gated_q_lst = []
-        _gated_a_lst = []
-        _vec_normed_q_lst = []
-        _vec_normed_a_lst = []
-        _sim_mtx_lst = []
-        _word_atten_mtx_lst= []
-        _q_words_best_match_lst = []
-        _q_score_lst = []
-        for i in range(perspectives):
-            _gate_layer_lst.append(TimeDistributed(Dense(units = wdim,
-                                                  activation = 'sigmoid',
-                                                  use_bias = True,
-                                                  )))
-            _q_gate_lst.append(_gate_layer_lst[i](_q_input)) # (perspectives, sent len, wdim)
-            _a_gate_lst.append(_gate_layer_lst[i](_a_input))
-            _gated_q_lst.append(Multiply()([_q_input, _q_gate_lst[i]])) # (perspectives, sent len, wdim)
-            _gated_a_lst.append(Multiply()([_a_input, _a_gate_lst[i]]))
-            _vec_normed_q_lst.append(L2NormLayer()(_gated_q_lst[i])) # (perspectives, sent len, wdim)
-            _vec_normed_a_lst.append(L2NormLayer()(_gated_a_lst[i]))
-            _sim_mtx_lst.append(Dot(axes=-1)([_vec_normed_q_lst[i], _vec_normed_a_lst[i]])) # (perspectives, q_sent_len, a_sent_len)
-            _word_atten_mtx_lst.append()
-            _q_words_best_match_lst.append(MaxOnASeqLayer()(_sim_mtx_lst[i])) # (perspectives, q_sent_len)
-            _sum_along_q = SumScoreLayer()(_q_words_best_match_lst[i]) # (1, )
-            _q_score_lst.append(Multiply()([_sum_along_q, _q_len_denom_input])) # (perspectives, 1)
         
-        feed_fwd_lst = _q_score_lst # a list of tensors to concatenate
-        feed_fwd_tensr_len = perspectives # + 4
+        feed_fwd_lst = [] # a list of tensors to concatenate
+        feed_fwd_tensr_len = perspectives # length of matching feature vec
+        # multi-perspective version of the above mechanism
+        for _ in range(perspectives):
+            gate_layer = TimeDistributed(Dense(units = wdim,
+                                               activation = 'sigmoid',
+                                               use_bias = True,
+                                               ))
+            _q_gate = gate_layer(_q_input) # (*perspectives*, sent len, wdim), same gate
+            _a_gate = gate_layer(_a_input)
+            _gated_q = Multiply()([_q_input, _q_gate]) # (*perspectives*, sent len, wdim)
+            _gated_a = Multiply()([_a_input, _a_gate])
+            # match mechanism
+            #_normed_q = L2NormLayer()(_q_input) # (*perspectives*, sent len, wdim)
+            #_normed_a = L2NormLayer()(_a_input)
+            _normed_q = L2NormLayer()(_gated_q) # (*perspectives*, sent len, wdim)
+            _normed_a = L2NormLayer()(_gated_a)
+            # match mechanism specified similarity matrix
+            _sim_mtx = Dot(axes = -1)([_normed_q, _normed_a]) # (*perspectives*, q_sent_len, a_sent_len)
+            # attention bag-of-word
+            _q_atten_mtx = Softmax(axis = -2)(_sim_mtx) # (*perspectives*, q_len, a_len)
+            #_a_atten_mtx = Permute((2, 1))(Softmax(axis = -1)(_sim_mtx)) # (*perspectives*, a_len, q_len), a transposed sim matrix softmaxed along a sent
+            _q_to_a_contxt_mtx = Dot(axes = -2)([_q_atten_mtx, _q_input]) # (*perspectives*, a_sent_len, wdim), per-feature weighed sum(dot), weighed bag-of-words
+            #_a_to_q_contxt_mtx = Dot(axes = -1)([_a_atten_mtx, _a_input]) # (*perspectives*, a_sent_len, wdim)
+            # attention similarity matching
+            _normed_q_to_a_contxt_mtx = L2NormLayer()(_q_to_a_contxt_mtx)
+            #_normed_a_to_q_contxt_mtx = L2NormLayer()(_a_to_q_contxt_mtx)
+            _atten_q_to_a_match_mtx = Dot(axes = -1)([_normed_q_to_a_contxt_mtx, _gated_a])
+            #_atten_a_to_q_match_mtx = Dot(axes = -1)([_normed_a_to_q_contxt_mtx, _gated_q])
+            # scoring
+            # word level
+            _q_words_best_match = MaxOnASeqLayer()(_sim_mtx) # (*perspectives*, q_sent_len)
+            #_a_words_best_match = MaxOnASeqLayer()(_sim_mtx) # disabled, proved to be disfavoring
+            _sum_along_q = SumScoreLayer()(_q_words_best_match) # (1, )
+            #_sum_along_a = SumScoreLayer()(_a_words_best_match) 
+            feed_fwd_lst.append(Multiply()([_sum_along_q, _q_len_denom_input])) # (*perspectives*, 1), average on q word-level
+            # attention context level
+            _a_attention_best_match = MaxOnASeqLayer()(_atten_q_to_a_match_mtx) # (*perspectives*, a_sent_len)
+            #_q_attention_best_match = MaxOnASeqLayer()(_atten_a_to_q_match_mtx) # (*perspectives*, q_sent_len)
+            _sum_along_a_atten = SumScoreLayer()(_a_attention_best_match) # (1, )
+            #_sum_along_q_atten = SumScoreLayer()(_q_attention_best_match) 
+            feed_fwd_lst.append(Multiply()([_sum_along_a_atten, _a_len_denom_input])) # (*perspectives*, 1), average on a (attentive) word-level
+        
         # concatenate res dim: (?, )
         #_conc_res = Concatenate()([_q_pooled_maps_siam, _a_pooled_maps_siam, feat_match_1_to_2, feat_match_2_to_1, _add_feat_input])
         #_conc_res = Concatenate()([feat_match_1_to_2, feat_match_2_to_1, _add_feat_input])
