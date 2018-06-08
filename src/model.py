@@ -115,7 +115,7 @@ class ConvQAModelGraph(object):
         _sim_mtx_lst = []
         _q_words_best_match_lst = []
         _q_score_lst = []
-        for i in perspectives:
+        for i in range(perspectives):
             _gate_layer_lst.append(TimeDistributed(Dense(units = wdim,
                                                   activation = 'sigmoid',
                                                   use_bias = True,
@@ -131,16 +131,20 @@ class ConvQAModelGraph(object):
             _sum_along_q = SumScoreLayer()(_q_words_best_match_lst[i]) # (1, )
             _q_score_lst.append(Multiply()([_sum_along_q, _q_len_denom_input])) # (perspectives, 1)
         
+        feed_fwd_lst = _q_score_lst
         # concatenate res dim: (6, )
         #_conc_res = Concatenate()([_q_pooled_maps_siam, _a_pooled_maps_siam, feat_match_1_to_2, feat_match_2_to_1, _add_feat_input])
         #_conc_res = Concatenate()([feat_match_1_to_2, feat_match_2_to_1, _add_feat_input])
-        _conc_res = Concatenate()(_q_score_lst)
+        if len(feed_fwd_lst) > 1:
+            _conc_res = Concatenate()(feed_fwd_lst)
+        else:
+            _conc_res = feed_fwd_lst[0]
         
         # hidden layer out dim: (6, )
-        _hid_res = Dense(units = perspectives,# + 4,
-                         activation = 'tanh',
-                         use_bias = True,
-                         kernel_regularizer = regularizers.l2(0.0001),
+        _hid_res = Dense(units = 1, #perspectives,# + 4,
+                         activation = 'linear', #'tanh',
+                         kernel_initializer = 'ones',
+                         use_bias = False, # True, kernel_regularizer = regularizers.l2(0.0001),
                          )(_conc_res)
                          
         # dropout some units before computing softmax result
@@ -165,7 +169,7 @@ class ConvQAModelGraph(object):
                      use_bias = False,
                      kernel_regularizer = regularizers.l2(0.0001),
                      )(_hid_res)
-        self.graph_output_unit = _res
+        self.graph_output_unit = _hid_res
         
     def get_model_inputs(self):
         return self.graph_input_units
@@ -190,7 +194,14 @@ class TestModelGraph(object):
         _q_match_score_sum = SumScoreLayer()(_q_words_best_match) # (1, )
         _q_match_score_ave = Multiply()([_q_match_score_sum, _q_len_input]) # (1, )
         
-        self.output_graph_unit = _q_match_score_ave, _q_match_score_sum, _q_words_best_match, cos_sim_score_q_a
+        hid_layer = Dense(units = 1,# + 4,
+                         activation = 'linear',
+                         kernel_initializer='ones',
+                         use_bias = False, #kernel_regularizer = regularizers.l2(0.0001),
+                         )
+        hid_res = hid_layer(_q_match_score_ave)
+        
+        self.output_graph_unit = hid_res, _q_match_score_ave, _q_match_score_sum, _q_words_best_match, cos_sim_score_q_a
     
     def get_model_inputs(self):
         return self.input_graph_unit

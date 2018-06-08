@@ -51,11 +51,12 @@ if __name__ == '__main__':
     my_model.compile(optimizer='adadelta', loss='binary_crossentropy')
     my_model.summary()
     #model.fit(x=np.array([[1.0,1.0,1.0,1.0,1.0]]), y=)
-    for layer in my_model.layers:
-        print(layer.get_weights())
+    #for layer in my_model.layers:
+    #    print(layer.get_weights())
     q = np.array([[[1.0, 1.0, 1.0, 1.0], [0.0, 0.0, 0.0, 1.0]]])
     a = np.array([[[-1.0, 0.0, 1.0, 1.0], [0.0, -1.0, 0.0, 1.0], [0.0, 0.0, 0.0, -1.0]]])
     x = [q, q_len_in, a]
     res = my_model.predict(x)
-    print(res)
+    for _ in res:
+        print(_)
     
