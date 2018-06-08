@@ -10,7 +10,7 @@ from model import TestModelGraph
 from keras.models import Model
 from keras.layers import Dot 
 from keras.constraints import non_neg
-from keras.backend import variable, eval, dot
+from keras.backend import variable, eval, dot, reshape
 import numpy as np
 
 if __name__ == '__main__':
@@ -33,9 +33,11 @@ if __name__ == '__main__':
     #print(val_)
     var = variable(value=val)
     var_ = variable(value=val_)
+    print(eval(var_))
+    var_ = reshape(var_, shape = (3,1))
     #print(var)
     #c = MultiDimSftmxConstraint(axis=0)
-    print(eval(var))
+    print(eval(var_))
     '''
     
     q_seg = ['whats', 'this']
