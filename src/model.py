@@ -126,15 +126,15 @@ class ConvQAModelGraph(object):
             # match mechanism specified similarity matrix
             _sim_mtx = Dot(axes = -1)([_normed_q, _normed_a]) # (*perspectives*, q_sent_len, a_sent_len)
             # attention bag-of-word
-            _q_atten_mtx = Softmax(axis = -2)(_sim_mtx) # (*perspectives*, q_len, a_len)
-            #_a_atten_mtx = Permute((2, 1))(Softmax(axis = -1)(_sim_mtx)) # (*perspectives*, a_len, q_len), a transposed sim matrix softmaxed along a sent
-            _q_to_a_contxt_mtx = Dot(axes = -2)([_q_atten_mtx, _q_input]) # (*perspectives*, a_sent_len, wdim), per-feature weighed sum(dot), weighed bag-of-words
-            #_a_to_q_contxt_mtx = Dot(axes = -1)([_a_atten_mtx, _a_input]) # (*perspectives*, a_sent_len, wdim)
+            #_q_atten_mtx = Softmax(axis = -2)(_sim_mtx) # (*perspectives*, q_len, a_len)
+            _a_atten_mtx = Permute((2, 1))(Softmax(axis = -1)(_sim_mtx)) # (*perspectives*, a_len, q_len), a transposed sim matrix softmaxed along a sent
+            #_q_to_a_contxt_mtx = Dot(axes = -2)([_q_atten_mtx, _q_input]) # (*perspectives*, a_sent_len, wdim), per-feature weighed sum(dot), weighed bag-of-words
+            _a_to_q_contxt_mtx = Dot(axes = -2)([_a_atten_mtx, _a_input]) # (*perspectives*, q_sent_len, wdim)
             # attention similarity matching
-            _normed_q_to_a_contxt_mtx = L2NormLayer()(_q_to_a_contxt_mtx)
-            #_normed_a_to_q_contxt_mtx = L2NormLayer()(_a_to_q_contxt_mtx)
-            _atten_q_to_a_match_mtx = Dot(axes = -1)([_normed_q_to_a_contxt_mtx, _gated_a])
-            #_atten_a_to_q_match_mtx = Dot(axes = -1)([_normed_a_to_q_contxt_mtx, _gated_q])
+            #_normed_q_to_a_contxt_mtx = L2NormLayer()(_q_to_a_contxt_mtx)
+            _normed_a_to_q_contxt_mtx = L2NormLayer()(_a_to_q_contxt_mtx)
+            #_atten_q_to_a_match_res_mtx = Multiply()([_normed_q_to_a_contxt_mtx, _normed_a]) # (*perspectives*, a_sent_len, wdim)
+            _atten_a_to_q_match_res_mtx = Multiply()([_normed_a_to_q_contxt_mtx, _normed_q]) # (*perspectives*, q_sent_len, wdim)
             # scoring
             # word level
             _q_words_best_match = MaxOnASeqLayer()(_sim_mtx) # (*perspectives*, q_sent_len)
@@ -143,11 +143,11 @@ class ConvQAModelGraph(object):
             #_sum_along_a = SumScoreLayer()(_a_words_best_match) 
             feed_fwd_lst.append(Multiply()([_sum_along_q, _q_len_denom_input])) # (*perspectives*, 1), average on q word-level
             # attention context level
-            _a_attention_best_match = MaxOnASeqLayer()(_atten_q_to_a_match_mtx) # (*perspectives*, a_sent_len)
-            #_q_attention_best_match = MaxOnASeqLayer()(_atten_a_to_q_match_mtx) # (*perspectives*, q_sent_len)
-            _sum_along_a_atten = SumScoreLayer()(_a_attention_best_match) # (1, )
-            #_sum_along_q_atten = SumScoreLayer()(_q_attention_best_match) 
-            feed_fwd_lst.append(Multiply()([_sum_along_a_atten, _a_len_denom_input])) # (*perspectives*, 1), average on a (attentive) word-level
+            #_atten_a_match_score = SumByAxisLayer(axis = -1, keepdims = False)(_atten_q_to_a_match_res_mtx) # (*perspectives*, q_sent_len)
+            _atten_q_match_score = SumByAxisLayer(axis = -1, keepdims = False)(_atten_a_to_q_match_res_mtx) # (*perspectives*, q_sent_len)
+            #_sum_along_a_atten = SumScoreLayer()(_atten_a_match_score) # (*perspectives*, 1)
+            _sum_along_q_atten = SumScoreLayer()(_atten_q_match_score) 
+            feed_fwd_lst.append(Multiply()([_sum_along_q_atten, _q_len_denom_input])) # (*perspectives*, 1), average on a (attentive) word-level
         
         # concatenate res dim: (?, )
         #_conc_res = Concatenate()([_q_pooled_maps_siam, _a_pooled_maps_siam, feat_match_1_to_2, feat_match_2_to_1, _add_feat_input])

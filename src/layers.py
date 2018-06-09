@@ -86,11 +86,29 @@ class MaxOnASeqLayer(Layer):
     
     def compute_output_shape(self, input_shape):
         return (input_shape[0], input_shape[1])  # (batch_idx, q_len)
-
+'''
+class KMaxScoreLayer(Layer):
+    """
+     Given tensor of size (s_len,)
+     this layer finds the best k score for each match res in s, calc the ave of them 
+    """
+    def __init__(self, **kwargs):
+        #self.output_dim = output_dim
+        super(KMaxScoreLayer, self).__init__(**kwargs)
+        
+    def build(self, input_shape):
+        super(KMaxScoreLayer, self).build(input_shape)
+        
+    def call(self, x):
+        return tensor_sum(x, axis=-1, keepdims=True)
+    
+    def compute_output_shape(self, input_shape):
+        return (input_shape[0], 1)  # (batch_idx, 1)'''
+    
 class SumScoreLayer(Layer):
     """
-     Given tensor of size (q_len,)
-     this layer sums best match score for each word in q, calc the general score 
+     Given tensor of size (s_len,)
+     this layer sums score for each word in s
     """
     def __init__(self, **kwargs):
         #self.output_dim = output_dim
