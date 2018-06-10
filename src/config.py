@@ -68,7 +68,7 @@ class PreProcessConfig(object):
     W2V_NEG_SAMP = 0
     W2V_HIER_SFTMX = 1
     # wv feature
-    TO_NORM = True
+    TO_NORM = False
 
 class ModelConfig(object):
     SUPPORTED_DATASET = set(['HITNLP', 'TREC'])
@@ -88,7 +88,7 @@ class ModelConfig(object):
     # word-level similarity config
     Q_DENOMINATOR = 'SENTENCE_LEN'#, 'SET_LEN'
     A_DENOMINATOR = 'SENTENCE_LEN'#, 'SET_LEN'
-    PERSPECTIVES = 5
+    PERSPECTIVES = 1
     # train config
     BATCH_SIZE = 32
     TRAIN_EPOCH = 5

@@ -18,10 +18,10 @@ class ConvQAModelGraph(object):
         # hyperparameters
         conv_filter_len_siam = cfg.ModelConfig.CONV_FILTER_LEN_SIAM
         feat_map_num_siam = cfg.ModelConfig.FEATURE_MAP_NUM_SIAM
-        conv_filter_len_1 = cfg.ModelConfig.CONV_FILTER_LEN_1
-        feat_map_num_1 = cfg.ModelConfig.FEATURE_MAP_NUM_1
-        conv_filter_len_2 = cfg.ModelConfig.CONV_FILTER_LEN_2
-        feat_map_num_2 = cfg.ModelConfig.FEATURE_MAP_NUM_2
+        #conv_filter_len_1 = cfg.ModelConfig.CONV_FILTER_LEN_1
+        #feat_map_num_1 = cfg.ModelConfig.FEATURE_MAP_NUM_1
+        #conv_filter_len_2 = cfg.ModelConfig.CONV_FILTER_LEN_2
+        #feat_map_num_2 = cfg.ModelConfig.FEATURE_MAP_NUM_2
         perspectives = cfg.ModelConfig.PERSPECTIVES
         
         # input dim: (sentence length, word dim)
@@ -33,15 +33,15 @@ class ConvQAModelGraph(object):
         self.graph_input_units = (_q_input, _a_input, _q_len_denom_input, _a_len_denom_input, _add_feat_input)
         
         # siamese convolution layer out dim: (sentence length, feat map num)
-        #siamese_conv_layer = Conv1D(input_shape = (None, wdim),
-        #                         filters = feat_map_num_siam,
-        #                         kernel_size = conv_filter_len_siam,
-        #                         padding='same',
-        #                         activation = 'relu',
-        #                         kernel_regularizer = regularizers.l2(0.00001),
-        #                         )
-        #_q_feature_maps_siam = siamese_conv_layer(_q_input)
-        #_a_feature_maps_siam = siamese_conv_layer(_a_input)
+        siamese_conv_layer = Conv1D(input_shape = (None, wdim),
+                                 filters = feat_map_num_siam,
+                                 kernel_size = conv_filter_len_siam,
+                                 padding='same',
+                                 activation = 'relu',
+                                 kernel_regularizer = regularizers.l2(0.00001),
+                                 )
+        _q_feature_maps_siam = siamese_conv_layer(_q_input)
+        _a_feature_maps_siam = siamese_conv_layer(_a_input)
         
         # independent convolution layer 1 out dim: (sentence length_1, feat map num_1)
         # independent convolution layer 2 out dim: (sentence length_2, feat map num_2)
@@ -61,13 +61,22 @@ class ConvQAModelGraph(object):
         #                         )(_a_input)
                                  
         # siamese pooling res dim: (feat_map_num_1, )
-        #_q_pooled_maps_siam = GlobalMaxPooling1D()(_q_feature_maps_siam)
-        #_a_pooled_maps_siam = GlobalMaxPooling1D()(_a_feature_maps_siam)
+        _q_pooled_maps_siam = GlobalMaxPooling1D()(_q_feature_maps_siam)
+        _a_pooled_maps_siam = GlobalMaxPooling1D()(_a_feature_maps_siam)
         
         # q pooling indep res dim: (feat_map_num_1, )
         # a pooling indep res dim: (feat_map_num_2, )
         #_q_pooled_maps_indep = GlobalMaxPooling1D()(_q_feature_maps_indep)
         #_a_pooled_maps_indep = GlobalMaxPooling1D()(_a_feature_maps_indep)
+        
+        # siamese match
+        noise_match_layer = Dense(units = feat_map_num_siam,
+                                   activation = None,
+                                   use_bias = False,
+                                   kernel_regularizer = regularizers.l2(0.0001),
+                                   )
+        _q_to_a_interm = noise_match_layer(_q_pooled_maps_siam)
+        _conv_score = Dot(axes=-1)([_q_to_a_interm, _a_pooled_maps_siam])
         
         # bilateral feature attention
         # feat_1 -> feat_2 attention res dim: (feat_map_2, )
@@ -88,8 +97,8 @@ class ConvQAModelGraph(object):
         #feat_match_2_to_1 = feat_match_layer([normed_a_to_q_feat, normed_q_feat])
         
         # distributional similarity, out dim: (1, )
-        #_atten_q = TimeDistributed(AttentionMatrixLayer(output_dim=wdim))(_q_input)
-        '''
+        #_atten_q = TimeDistributed(AttentionMatrixLayer(output_dim=wdim))(_q_input)'''
+        
         gate_layer = TimeDistributed(Dense(units = wdim,
                                             activation = 'sigmoid',
                                             use_bias = True,
@@ -104,10 +113,10 @@ class ConvQAModelGraph(object):
         _q_words_best_match = MaxOnASeqLayer()(_q_a_sim_mtx)
         _q_match_score_sum = SumScoreLayer()(_q_words_best_match) # (1, )
         _q_match_score_ave = Multiply()([_q_match_score_sum, _q_len_denom_input]) # (1, )
-        '''
         
-        feed_fwd_lst = [] # a list of tensors to concatenate
-        feed_fwd_tensr_len = perspectives # length of matching feature vec
+        
+        feed_fwd_lst = [_q_pooled_maps_siam, _a_pooled_maps_siam, _conv_score] # a list of tensors to concatenate
+        feed_fwd_tensr_len = feat_map_num_siam * 2 + 1 #+ perspectives# length of matching feature vec
         # multi-perspective version of the above mechanism
         for _ in range(perspectives):
             gate_layer = TimeDistributed(Dense(units = wdim,
@@ -141,13 +150,13 @@ class ConvQAModelGraph(object):
             #_a_words_best_match = MaxOnASeqLayer()(_sim_mtx) # disabled, proved to be disfavoring
             _sum_along_q = SumScoreLayer()(_q_words_best_match) # (1, )
             #_sum_along_a = SumScoreLayer()(_a_words_best_match) 
-            feed_fwd_lst.append(Multiply()([_sum_along_q, _q_len_denom_input])) # (*perspectives*, 1), average on q word-level
+            #feed_fwd_lst.append(Multiply()([_sum_along_q, _q_len_denom_input])) # (*perspectives*, 1), average on q word-level
             # attention context level
             #_atten_a_match_score = SumByAxisLayer(axis = -1, keepdims = False)(_atten_q_to_a_match_res_mtx) # (*perspectives*, q_sent_len)
             _atten_q_match_score = SumByAxisLayer(axis = -1, keepdims = False)(_atten_a_to_q_match_res_mtx) # (*perspectives*, q_sent_len)
             #_sum_along_a_atten = SumScoreLayer()(_atten_a_match_score) # (*perspectives*, 1)
             _sum_along_q_atten = SumScoreLayer()(_atten_q_match_score) 
-            feed_fwd_lst.append(Multiply()([_sum_along_q_atten, _q_len_denom_input])) # (*perspectives*, 1), average on a (attentive) word-level
+            #feed_fwd_lst.append(Multiply()([_sum_along_q_atten, _q_len_denom_input])) # (*perspectives*, 1), average on a (attentive) word-level
         
         # concatenate res dim: (?, )
         #_conc_res = Concatenate()([_q_pooled_maps_siam, _a_pooled_maps_siam, feat_match_1_to_2, feat_match_2_to_1, _add_feat_input])
@@ -157,27 +166,25 @@ class ConvQAModelGraph(object):
         else:
             _conc_res = feed_fwd_lst[0]
         
-        # hidden layer out dim: (?, )
-        #_hid_gate_weight = Dense(units = feed_fwd_tensr_len, # always in accordance with input
-        #                         activation = 'tanh',
-        #                         use_bias = False,
-        #                         kernel_regularizer = regularizers.l2(0.0001),
-        #                         )(_conc_res)
+        _hid_res = Dense(units = feed_fwd_tensr_len, # always in accordance with input
+                                 activation = 'tanh',
+                                 use_bias = True,
+                                 kernel_regularizer = regularizers.l2(0.0001),
+                                 )(_conc_res)
         # dropout some units before computing softmax result
-        #_dropped_hid_gate = Dropout(rate=0.5)(_hid_gate_weight)
-        #_hid_res = Multiply()([_hid_gate_weight, _conc_res])
+        _dropped_hid_res = Dropout(rate=0.5)(_hid_res)
         
-        #_res = Dense(units = 1,
-        #             activation = 'sigmoid',
-        #             use_bias = False,
-        #             kernel_regularizer = regularizers.l2(0.0001),
-        #             )(_dropped_hid_res)
-        _res_gate_weight = Dense(units = feed_fwd_tensr_len, # always in accordance with input
-                     activation = 'softmax',
+        _res = Dense(units = 1,
+                     activation = 'sigmoid',
                      use_bias = False,
                      kernel_regularizer = regularizers.l2(0.0001),
-                     )(_conc_res)
-        _res = Dot(axes=-1)([_res_gate_weight, _conc_res])
+                     )(_dropped_hid_res)
+        #_res_gate_weight = Dense(units = feed_fwd_tensr_len, # always in accordance with input
+        #             activation = 'softmax',
+        #             use_bias = False,
+        #             kernel_regularizer = regularizers.l2(0.0001),
+        #             )(_conc_res)
+        #_res = Dot(axes=-1)([_res_gate_weight, _conc_res])
         self.graph_output_unit = _res
         
     def get_model_inputs(self):

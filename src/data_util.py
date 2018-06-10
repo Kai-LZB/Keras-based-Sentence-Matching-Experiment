@@ -760,7 +760,7 @@ class SentenceDataStream(object):
                                     self.instances[i][-1]]
                                     )
                 if self.t_e_mode == 't':
-                    label_lst.append(self.instances[i][2])
+                    label_lst.append(self.instances[i][4])
             # padding
             q_len_lst = [len(seq) for seq in q_idx_seq_lst]
             a_len_lst = [len(seq) for seq in a_idx_seq_lst]
