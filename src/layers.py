@@ -10,6 +10,7 @@ customized layer design
 from keras import backend as K
 from keras import regularizers
 from keras.engine.topology import Layer
+from keras.layers import Dense
 from keras.backend import max as tensor_max
 from keras.backend import sum as tensor_sum
 from keras.backend import exp, l2_normalize
